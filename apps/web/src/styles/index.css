@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* ── Zapier 设计系统：自定义颜色 Token ── */
+@theme {
+  --color-canvas: #fffefb;          /* 暖奶油白 — 页面底色 */
+  --color-canvas-soft: #f8f4f0;     /* 柔奶油 — 卡片底色 */
+  --color-ink: #201515;             /* 深咖啡 — 主文字 */
+  --color-ink-soft: #2f2a26;        /* 次深 — 次级文字 */
+  --color-ink-mid: #36342e;         /* 中深 — 标签等 */
+  --color-body: #605d52;            /* 正文色 */
+  --color-body-mid: #939084;        /* 次级正文 */
+  --color-mute: #c5c0b1;            /* 低强调文字 / 分割线 */
+  --color-primary: #ff4f00;         /* 饱和橙 — 唯一 CTA */
+  --color-primary-hover: #e64700;   /* hover 加深 */
+}

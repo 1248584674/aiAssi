@@ -1,0 +1,26 @@
+{
+  "name": "ai-assistant",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "db:migrate": "npm run migrate -w packages/database",
+    "db:studio": "npm run studio -w packages/database",
+    "db:seed": "npm run seed -w packages/database",
+    "build": "npm run build -w packages/agent-core && npm run build -w apps/api && npm run build -w apps/web",
+    "test": "npm run test -w packages/agent-core"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "prisma": "^6.19.3"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@ai-assistant/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@ai-assistant/agent-core": "*",
+    "@ai-assistant/database": "*",
+    "@ai-assistant/shared": "*",
+    "@prisma/client": "^6.5.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.1.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "tsx": "^4.19.0"
+  }
+}

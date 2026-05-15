@@ -1,0 +1,1614 @@
+下面这份可以**整段复制给 Claude Code**，让它按这个需求开发。
+
+---
+
+````markdown
+# AI 原生企业效率 Agent：需求文档 + 架构设计文档
+
+## 0. 项目目标
+
+我要开发一个 AI 原生企业效率 Agent。
+
+核心场景：
+
+1. 日程管理
+2. 费用报销
+3. 企业工作流自动化
+
+产品目标不是做传统 OA 系统，而是做一个“自然语言驱动的企业助手”。
+
+用户不需要手动找入口、填表单、点流程，而是直接对 AI 说：
+
+- 明天下午帮我约张三开会
+- 帮我报销昨天去机场的打车费
+- 查一下我上周提交的报销为什么被驳回
+- 帮我整理一下这周的日程
+
+AI 需要自动完成：
+
+1. 理解用户意图
+2. 提取关键信息
+3. 判断缺失字段
+4. 主动追问用户
+5. 拆解任务步骤
+6. 调用对应业务工具
+7. 生成草稿
+8. 让用户确认
+9. 最终保存或提交
+10. 记录完整执行日志
+
+---
+
+# 第一部分：产品需求文档 PRD
+
+## 1. 产品定位
+
+本项目是一个面向企业内部使用的 AI Agent 系统。
+
+它不是传统的日程软件，也不是传统的报销软件，而是一个通过自然语言完成企业事务的智能工作台。
+
+核心理念：
+
+> 用 Agent 替代传统表单式软件交互。
+
+用户只需要说出目标，系统自动完成中间流程。
+
+---
+
+## 2. 核心用户
+
+### 2.1 普通员工
+
+主要需求：
+
+- 创建日程
+- 修改日程
+- 查看日程
+- 发起报销
+- 查询报销状态
+- 补充报销材料
+- 理解审批驳回原因
+
+### 2.2 管理者 / 审批人
+
+主要需求：
+
+- 查看待审批报销
+- 查看团队日程
+- 审批或驳回报销
+- 让 AI 总结某个人或某个项目的费用情况
+
+### 2.3 系统管理员
+
+主要需求：
+
+- 配置报销规则
+- 配置审批流
+- 查看 Agent 执行日志
+- 排查任务失败原因
+- 管理用户权限
+
+---
+
+## 3. 核心痛点
+
+传统企业系统的问题：
+
+1. 表单太复杂
+2. 功能入口太多
+3. 用户不知道该填什么
+4. 报销经常因为缺字段被驳回
+5. 日程修改和冲突检查麻烦
+6. 任务失败后日志难以追踪
+7. 用户需要理解系统规则，而不是系统理解用户
+
+本项目要解决的问题：
+
+1. 用户用自然语言表达需求
+2. AI 自动把自然语言转成结构化任务
+3. AI 自动判断缺失字段
+4. AI 主动追问用户
+5. AI 自动调用工具完成业务操作
+6. 高风险操作前必须让用户确认
+7. 所有 Agent 推理和工具调用都要有日志
+
+---
+
+## 4. MVP 范围
+
+第一阶段只做最小可行版本，不做太复杂。
+
+### 4.1 MVP 必须实现
+
+1. 聊天式输入界面
+2. 用户自然语言输入
+3. 意图识别 Intent Router
+4. 日程创建 Calendar Create
+5. 报销草稿创建 Expense Draft Create
+6. 缺失字段追问
+7. 用户确认后保存
+8. Agent 执行日志
+9. 工具调用日志
+10. 基础数据库设计
+
+### 4.2 MVP 暂不实现
+
+第一阶段不做：
+
+1. 真正对接企业微信
+2. 真正对接钉钉
+3. 真正对接真实财务系统
+4. 真正打款
+5. 多租户复杂权限
+6. 复杂审批流引擎
+7. 移动端 App
+8. 语音输入
+9. 自动读取邮箱
+10. 自动读取聊天记录
+
+这些功能后续再扩展。
+
+---
+
+## 5. 核心功能需求
+
+---
+
+# 5.1 Chat UI：聊天入口
+
+## 功能说明
+
+用户通过聊天框输入自然语言任务。
+
+例如：
+
+```text
+帮我明天下午三点约张三开个产品评审会。
+````
+
+或者：
+
+```text
+帮我报销昨天去机场的打车费，金额 128 元。
+```
+
+系统需要返回 AI 的理解结果、追问问题、执行进度和最终结果。
+
+## 页面要求
+
+页面至少包含：
+
+1. 左侧会话列表
+2. 中间聊天区域
+3. 底部输入框
+4. 任务执行状态展示
+5. Agent 工具调用日志入口
+
+## 消息类型
+
+至少支持以下消息类型：
+
+```ts
+type MessageRole = "user" | "assistant" | "system" | "tool";
+
+type MessageType =
+  | "text"
+  | "intent_result"
+  | "missing_fields"
+  | "confirmation"
+  | "tool_result"
+  | "error";
+```
+
+---
+
+# 5.2 Intent Router：意图识别
+
+## 功能说明
+
+系统收到用户输入后，第一步要识别用户意图。
+
+支持的意图：
+
+```ts
+type Intent =
+  | "calendar.create"
+  | "calendar.update"
+  | "calendar.query"
+  | "calendar.delete"
+  | "expense.create"
+  | "expense.query"
+  | "expense.update"
+  | "expense.submit"
+  | "general.chat"
+  | "unknown";
+```
+
+## 示例 1
+
+用户输入：
+
+```text
+明天下午三点约张三开会
+```
+
+系统输出：
+
+```json
+{
+  "intent": "calendar.create",
+  "confidence": 0.92,
+  "entities": {
+    "time": "明天下午三点",
+    "participants": ["张三"],
+    "action": "创建日程"
+  }
+}
+```
+
+## 示例 2
+
+用户输入：
+
+```text
+帮我报销昨天打车去机场的钱
+```
+
+系统输出：
+
+```json
+{
+  "intent": "expense.create",
+  "confidence": 0.91,
+  "entities": {
+    "date": "昨天",
+    "expense_type": "交通费",
+    "description": "打车去机场"
+  }
+}
+```
+
+---
+
+# 5.3 Planner：任务规划器
+
+## 功能说明
+
+Planner 负责把用户目标拆成可执行步骤。
+
+Planner 不直接操作数据库，也不直接调用业务逻辑。
+
+Planner 只输出计划。
+
+## Planner 输出格式
+
+```json
+{
+  "goal": "创建一笔交通费报销草稿",
+  "intent": "expense.create",
+  "steps": [
+    {
+      "step_id": "step_1",
+      "action": "extract_expense_info",
+      "description": "从用户输入中提取报销信息"
+    },
+    {
+      "step_id": "step_2",
+      "action": "check_required_fields",
+      "description": "检查必填字段是否完整"
+    },
+    {
+      "step_id": "step_3",
+      "action": "ask_user_missing_info",
+      "description": "如果缺少字段，向用户追问"
+    },
+    {
+      "step_id": "step_4",
+      "action": "create_expense_draft",
+      "description": "创建报销草稿"
+    },
+    {
+      "step_id": "step_5",
+      "action": "wait_user_confirmation",
+      "description": "等待用户确认是否提交"
+    }
+  ]
+}
+```
+
+---
+
+# 5.4 Executor：执行器
+
+## 功能说明
+
+Executor 按照 Planner 生成的步骤执行任务。
+
+Executor 不能自己乱改数据库，必须通过 Tool Layer 调用工具。
+
+## 工具调用示例
+
+```ts
+await tools.calendar.createEvent(input);
+await tools.expense.createDraft(input);
+await tools.expense.submit(input);
+await tools.ocr.parseInvoice(input);
+```
+
+## 执行规则
+
+1. 每执行一步都要写日志
+2. 每次工具调用都要保存输入和输出
+3. 失败时要记录错误原因
+4. 高风险操作必须等待用户确认
+5. 不能跳过 Validator
+
+---
+
+# 5.5 Validator：校验器
+
+## 功能说明
+
+Validator 负责检查当前任务是否可以继续执行。
+
+检查内容包括：
+
+1. 必填字段是否完整
+2. 日期是否合法
+3. 金额是否合法
+4. 日程时间是否冲突
+5. 报销是否符合规则
+6. 是否需要用户确认
+7. 是否存在高风险操作
+
+## 报销校验示例
+
+```json
+{
+  "valid": false,
+  "missing_fields": ["amount", "invoice_file", "project"],
+  "message": "当前报销缺少金额、发票和项目归属，不能提交。"
+}
+```
+
+## 日程校验示例
+
+```json
+{
+  "valid": false,
+  "conflicts": [
+    {
+      "title": "已有会议：项目周会",
+      "start_time": "2026-05-15 15:00",
+      "end_time": "2026-05-15 16:00"
+    }
+  ],
+  "message": "该时间段已有会议，是否仍然创建？"
+}
+```
+
+---
+
+# 5.6 Memory：上下文记忆
+
+## 功能说明
+
+Memory 用来保存当前任务上下文和用户偏好。
+
+分为两类：
+
+### 短期记忆
+
+只在当前会话中有效。
+
+保存内容：
+
+1. 当前用户输入
+2. 当前任务类型
+3. 当前任务进度
+4. 用户刚刚补充的信息
+5. 当前缺失字段
+6. 当前草稿数据
+
+### 长期记忆
+
+后续版本实现。
+
+保存内容：
+
+1. 用户常用审批人
+2. 用户常用项目
+3. 用户常用参会人
+4. 用户常去城市
+5. 用户常用报销类型
+6. 用户默认部门
+7. 用户默认成本中心
+
+MVP 阶段可以先只做短期记忆。
+
+---
+
+# 5.7 日程管理模块
+
+## 必须支持
+
+MVP 阶段支持：
+
+1. 创建日程
+2. 查询日程冲突
+3. 生成日程草稿
+4. 用户确认后保存
+
+后续支持：
+
+1. 修改日程
+2. 删除日程
+3. 邀请参会人
+4. 自动生成会议链接
+5. 自动发送提醒
+6. 自动总结会议
+
+## 日程数据结构
+
+```ts
+interface CalendarEvent {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  participants: string[];
+  startTime: string;
+  endTime: string;
+  location?: string;
+  status: "draft" | "confirmed" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 用户输入示例
+
+```text
+明天下午三点帮我约张三开产品评审会。
+```
+
+## 如果信息完整
+
+AI 应返回：
+
+```text
+我理解你想创建一个日程：
+
+标题：产品评审会
+参与人：张三
+时间：明天下午 3 点
+时长：默认 1 小时
+
+是否确认创建？
+```
+
+## 如果信息不完整
+
+用户输入：
+
+```text
+帮我约张三开会。
+```
+
+AI 应返回：
+
+```text
+可以。请问会议安排在什么时间？会议主题是什么？
+```
+
+---
+
+# 5.8 费用报销模块
+
+## 必须支持
+
+MVP 阶段支持：
+
+1. 创建报销草稿
+2. 提取报销类型
+3. 提取金额
+4. 提取日期
+5. 提取说明
+6. 检查缺失字段
+7. 用户确认后保存草稿
+
+后续支持：
+
+1. OCR 识别发票
+2. 提交审批流
+3. 查询审批状态
+4. 解释驳回原因
+5. 修改后重新提交
+6. 自动匹配报销规则
+
+## 报销数据结构
+
+```ts
+interface Expense {
+  id: string;
+  userId: string;
+  expenseType: "transport" | "hotel" | "meal" | "office" | "travel" | "other";
+  amount?: number;
+  currency: "CNY" | "USD";
+  expenseDate?: string;
+  city?: string;
+  projectId?: string;
+  description?: string;
+  invoiceFileIds: string[];
+  status: "draft" | "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 用户输入示例
+
+```text
+帮我报销昨天去机场的打车费，128 元。
+```
+
+AI 应返回：
+
+```text
+我理解你想创建一笔报销草稿：
+
+类型：交通费
+日期：昨天
+金额：128 元
+说明：打车去机场
+
+还缺少：发票、项目归属。
+
+请上传发票，并告诉我这笔费用属于哪个项目。
+```
+
+---
+
+# 5.9 用户确认机制
+
+## 功能说明
+
+所有重要操作都不能直接执行，必须让用户确认。
+
+需要确认的操作：
+
+1. 创建正式日程
+2. 修改日程
+3. 删除日程
+4. 提交报销
+5. 修改报销
+6. 删除报销
+7. 发起审批
+8. 通知其他人
+
+## 确认数据结构
+
+```ts
+interface ConfirmationRequest {
+  id: string;
+  sessionId: string;
+  action: string;
+  summary: string;
+  payload: Record<string, any>;
+  status: "pending" | "confirmed" | "cancelled";
+  createdAt: string;
+}
+```
+
+---
+
+# 5.10 日志追踪模块
+
+## 功能说明
+
+系统必须记录完整链路日志。
+
+因为 Agent 系统容易出现：
+
+1. 意图识别错误
+2. Planner 规划错误
+3. Tool 调用失败
+4. 参数缺失
+5. 用户中途修改需求
+6. LLM 输出格式不稳定
+
+所以必须有清晰日志。
+
+## 需要记录的日志
+
+1. 用户输入
+2. 意图识别结果
+3. Planner 输出
+4. 每一步执行状态
+5. 每次工具调用输入
+6. 每次工具调用输出
+7. 错误信息
+8. 最终结果
+
+## 日志数据结构
+
+```ts
+interface AgentToolCallLog {
+  id: string;
+  sessionId: string;
+  stepId?: string;
+  toolName: string;
+  inputJson: Record<string, any>;
+  outputJson?: Record<string, any>;
+  status: "success" | "failed";
+  errorMessage?: string;
+  createdAt: string;
+}
+```
+
+---
+
+# 第二部分：架构设计文档
+
+## 1. 总体架构
+
+系统采用分层架构：
+
+```text
+前端层
+Chat UI / Dashboard / Admin Panel
+        ↓
+API 层
+Auth / Session / Agent API / Business API
+        ↓
+Agent 编排层
+Intent Router / Planner / Executor / Validator / Memory
+        ↓
+工具调用层
+Calendar Tool / Expense Tool / OCR Tool / Approval Tool / Notification Tool
+        ↓
+业务服务层
+Calendar Service / Expense Service / User Service / File Service
+        ↓
+数据层
+PostgreSQL / Redis / Object Storage / Vector DB
+        ↓
+可观测性
+Agent Logs / Tool Logs / Error Logs / Trace ID
+```
+
+---
+
+## 2. 推荐技术栈
+
+### 前端
+
+```text
+Next.js
+React
+TypeScript
+Tailwind CSS
+shadcn/ui
+```
+
+### 后端
+
+```text
+Node.js
+NestJS 或 Fastify
+TypeScript
+Prisma ORM
+```
+
+### 数据库
+
+```text
+PostgreSQL
+Redis
+```
+
+### AI
+
+```text
+Claude API
+OpenAI Compatible API
+DeepSeek API 可选
+```
+
+### 文件存储
+
+```text
+S3 Compatible Storage
+本地存储可作为开发环境方案
+```
+
+### 日志与观测
+
+```text
+OpenTelemetry
+Loki
+Grafana
+Winston / Pino
+```
+
+MVP 阶段可以先用 PostgreSQL 保存日志，不必一开始就接 Grafana。
+
+---
+
+## 3. 推荐项目目录结构
+
+建议使用 monorepo。
+
+```text
+ai-enterprise-agent/
+  apps/
+    web/
+      src/
+        app/
+        components/
+        features/
+          chat/
+          calendar/
+          expense/
+          logs/
+        lib/
+        styles/
+
+    api/
+      src/
+        main.ts
+        app.module.ts
+
+        modules/
+          auth/
+          users/
+          agent/
+          calendar/
+          expense/
+          files/
+          logs/
+
+        common/
+          guards/
+          decorators/
+          filters/
+          interceptors/
+          utils/
+
+  packages/
+    agent-core/
+      src/
+        runtime/
+          agent-runtime.ts
+          intent-router.ts
+          planner.ts
+          executor.ts
+          validator.ts
+          memory.ts
+
+        tools/
+          tool.interface.ts
+          calendar.tool.ts
+          expense.tool.ts
+          ocr.tool.ts
+          approval.tool.ts
+          notification.tool.ts
+
+        schemas/
+          intent.schema.ts
+          plan.schema.ts
+          tool.schema.ts
+          message.schema.ts
+
+    database/
+      prisma/
+        schema.prisma
+        migrations/
+
+    shared/
+      src/
+        types/
+        constants/
+        utils/
+
+  docker-compose.yml
+  package.json
+  pnpm-workspace.yaml
+  README.md
+```
+
+---
+
+## 4. Agent Runtime 设计
+
+Agent Runtime 是整个系统核心。
+
+### 核心流程
+
+```text
+用户输入
+  ↓
+创建 Agent Session
+  ↓
+Intent Router 识别意图
+  ↓
+Planner 生成执行计划
+  ↓
+Validator 检查字段和风险
+  ↓
+如果缺字段：追问用户
+  ↓
+如果字段完整：Executor 调用工具
+  ↓
+生成草稿
+  ↓
+等待用户确认
+  ↓
+确认后保存或提交
+  ↓
+记录完整日志
+```
+
+---
+
+## 5. Agent Runtime 伪代码
+
+```ts
+class AgentRuntime {
+  constructor(
+    private intentRouter: IntentRouter,
+    private planner: Planner,
+    private executor: Executor,
+    private validator: Validator,
+    private memory: MemoryStore,
+    private logger: AgentLogger,
+  ) {}
+
+  async handleUserMessage(input: {
+    userId: string;
+    sessionId: string;
+    message: string;
+  }) {
+    await this.logger.logUserMessage(input);
+
+    const context = await this.memory.getSessionContext(input.sessionId);
+
+    const intentResult = await this.intentRouter.detect({
+      message: input.message,
+      context,
+    });
+
+    await this.logger.logIntentResult(input.sessionId, intentResult);
+
+    const plan = await this.planner.createPlan({
+      message: input.message,
+      intent: intentResult.intent,
+      entities: intentResult.entities,
+      context,
+    });
+
+    await this.logger.logPlan(input.sessionId, plan);
+
+    const validationResult = await this.validator.validate({
+      intent: intentResult.intent,
+      entities: intentResult.entities,
+      context,
+    });
+
+    if (!validationResult.valid) {
+      await this.memory.updateSessionContext(input.sessionId, {
+        intent: intentResult.intent,
+        entities: intentResult.entities,
+        missingFields: validationResult.missingFields,
+      });
+
+      return {
+        type: "missing_fields",
+        message: validationResult.message,
+        missingFields: validationResult.missingFields,
+      };
+    }
+
+    const executionResult = await this.executor.execute({
+      userId: input.userId,
+      sessionId: input.sessionId,
+      plan,
+      context,
+    });
+
+    return executionResult;
+  }
+}
+```
+
+---
+
+## 6. Tool Layer 设计
+
+所有业务能力都必须封装成工具。
+
+Agent 不能直接操作数据库。
+
+## Tool Interface
+
+```ts
+export interface AgentTool<Input = any, Output = any> {
+  name: string;
+  description: string;
+  schema: Record<string, any>;
+  execute(input: Input): Promise<Output>;
+}
+```
+
+---
+
+## 7. Calendar Tool
+
+```ts
+export interface CreateCalendarEventInput {
+  userId: string;
+  title: string;
+  description?: string;
+  participants?: string[];
+  startTime: string;
+  endTime: string;
+  location?: string;
+  status?: "draft" | "confirmed";
+}
+
+export interface CreateCalendarEventOutput {
+  eventId: string;
+  status: "draft" | "confirmed";
+  message: string;
+}
+
+export class CalendarCreateTool implements AgentTool {
+  name = "calendar.create";
+  description = "Create a calendar event draft or confirmed event.";
+
+  async execute(input: CreateCalendarEventInput): Promise<CreateCalendarEventOutput> {
+    // 1. check time conflict
+    // 2. create event
+    // 3. return result
+    return {
+      eventId: "event_xxx",
+      status: input.status || "draft",
+      message: "Calendar event created successfully.",
+    };
+  }
+}
+```
+
+---
+
+## 8. Expense Tool
+
+```ts
+export interface CreateExpenseDraftInput {
+  userId: string;
+  expenseType: string;
+  amount?: number;
+  currency?: string;
+  expenseDate?: string;
+  city?: string;
+  projectId?: string;
+  description?: string;
+  invoiceFileIds?: string[];
+}
+
+export interface CreateExpenseDraftOutput {
+  expenseId: string;
+  status: "draft";
+  missingFields?: string[];
+  message: string;
+}
+
+export class ExpenseCreateDraftTool implements AgentTool {
+  name = "expense.createDraft";
+  description = "Create an expense reimbursement draft.";
+
+  async execute(input: CreateExpenseDraftInput): Promise<CreateExpenseDraftOutput> {
+    // 1. validate required fields
+    // 2. create draft
+    // 3. return missing fields if any
+
+    return {
+      expenseId: "expense_xxx",
+      status: "draft",
+      missingFields: [],
+      message: "Expense draft created successfully.",
+    };
+  }
+}
+```
+
+---
+
+## 9. 数据库设计
+
+使用 PostgreSQL + Prisma。
+
+## User
+
+```prisma
+model User {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  department  String?
+  role        String   @default("employee")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessions    AgentSession[]
+  events      CalendarEvent[]
+  expenses    Expense[]
+}
+```
+
+---
+
+## AgentSession
+
+```prisma
+model AgentSession {
+  id             String   @id @default(uuid())
+  userId         String
+  currentIntent  String?
+  taskStatus     String   @default("active")
+  contextJson    Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id])
+  messages       AgentMessage[]
+  toolCalls      AgentToolCall[]
+}
+```
+
+---
+
+## AgentMessage
+
+```prisma
+model AgentMessage {
+  id          String   @id @default(uuid())
+  sessionId   String
+  role        String
+  type        String   @default("text")
+  content     String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  session     AgentSession @relation(fields: [sessionId], references: [id])
+}
+```
+
+---
+
+## AgentToolCall
+
+```prisma
+model AgentToolCall {
+  id            String   @id @default(uuid())
+  sessionId     String
+  stepId        String?
+  toolName      String
+  inputJson     Json
+  outputJson    Json?
+  status        String
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+
+  session       AgentSession @relation(fields: [sessionId], references: [id])
+}
+```
+
+---
+
+## CalendarEvent
+
+```prisma
+model CalendarEvent {
+  id            String   @id @default(uuid())
+  userId        String
+  title         String
+  description   String?
+  participants  Json?
+  startTime     DateTime
+  endTime       DateTime
+  location      String?
+  status        String   @default("draft")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id])
+}
+```
+
+---
+
+## Expense
+
+```prisma
+model Expense {
+  id              String   @id @default(uuid())
+  userId          String
+  expenseType     String
+  amount          Float?
+  currency        String   @default("CNY")
+  expenseDate     DateTime?
+  city            String?
+  projectId       String?
+  description     String?
+  invoiceFileIds  Json?
+  status          String   @default("draft")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id])
+}
+```
+
+---
+
+## ConfirmationRequest
+
+```prisma
+model ConfirmationRequest {
+  id          String   @id @default(uuid())
+  sessionId   String
+  action      String
+  summary     String
+  payload     Json
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+```
+
+---
+
+# 10. API 设计
+
+## Agent Chat API
+
+### POST /api/agent/chat
+
+用户发送消息。
+
+Request:
+
+```json
+{
+  "sessionId": "session_xxx",
+  "message": "帮我报销昨天去机场的打车费，128 元"
+}
+```
+
+Response:
+
+```json
+{
+  "type": "missing_fields",
+  "message": "还缺少发票和项目归属，请补充。",
+  "missingFields": ["invoice_file", "project"]
+}
+```
+
+---
+
+## Create Session API
+
+### POST /api/agent/sessions
+
+Response:
+
+```json
+{
+  "sessionId": "session_xxx"
+}
+```
+
+---
+
+## Get Session Messages API
+
+### GET /api/agent/sessions/:sessionId/messages
+
+Response:
+
+```json
+{
+  "messages": []
+}
+```
+
+---
+
+## Get Tool Logs API
+
+### GET /api/agent/sessions/:sessionId/tool-calls
+
+Response:
+
+```json
+{
+  "toolCalls": []
+}
+```
+
+---
+
+## Confirm Action API
+
+### POST /api/agent/confirm
+
+Request:
+
+```json
+{
+  "confirmationId": "confirm_xxx",
+  "confirmed": true
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "message": "操作已确认并执行。"
+}
+```
+
+---
+
+# 11. 前端页面设计
+
+## 11.1 Chat 页面
+
+路径：
+
+```text
+/chat
+```
+
+包含：
+
+1. 会话列表
+2. 聊天窗口
+3. 输入框
+4. 任务状态卡片
+5. 确认按钮
+6. 查看日志按钮
+
+---
+
+## 11.2 日程页面
+
+路径：
+
+```text
+/calendar
+```
+
+包含：
+
+1. 日程列表
+2. 日程详情
+3. 草稿状态
+4. 已确认状态
+
+---
+
+## 11.3 报销页面
+
+路径：
+
+```text
+/expenses
+```
+
+包含：
+
+1. 报销列表
+2. 报销草稿
+3. 报销详情
+4. 缺失字段提示
+
+---
+
+## 11.4 日志页面
+
+路径：
+
+```text
+/logs/:sessionId
+```
+
+展示：
+
+1. 用户输入
+2. Intent Router 输出
+3. Planner 输出
+4. Validator 输出
+5. Tool 调用记录
+6. 错误信息
+
+---
+
+# 12. Agent 输出格式要求
+
+所有 LLM 输出都必须尽量结构化。
+
+## Intent Router 输出
+
+```json
+{
+  "intent": "expense.create",
+  "confidence": 0.91,
+  "entities": {
+    "expenseType": "transport",
+    "amount": 128,
+    "date": "2026-05-13",
+    "description": "打车去机场"
+  }
+}
+```
+
+## Planner 输出
+
+```json
+{
+  "goal": "创建交通费报销草稿",
+  "intent": "expense.create",
+  "steps": [
+    {
+      "stepId": "1",
+      "action": "check_required_fields",
+      "tool": null
+    },
+    {
+      "stepId": "2",
+      "action": "create_expense_draft",
+      "tool": "expense.createDraft"
+    }
+  ]
+}
+```
+
+## Validator 输出
+
+```json
+{
+  "valid": false,
+  "missingFields": ["invoiceFileIds", "projectId"],
+  "riskLevel": "low",
+  "requiresConfirmation": false,
+  "message": "缺少发票和项目归属。"
+}
+```
+
+---
+
+# 13. 权限与安全
+
+## 基础规则
+
+1. 用户只能访问自己的日程和报销
+2. Agent 不能绕过权限
+3. 高风险操作必须二次确认
+4. 所有操作都必须写审计日志
+5. 工具调用必须有白名单
+6. Agent 不允许直接执行任意代码
+7. Agent 不允许直接访问数据库
+8. 所有外部 API 调用都要封装成 Tool
+
+---
+
+# 14. 错误处理
+
+## 常见错误
+
+1. LLM 输出不是合法 JSON
+2. 意图识别失败
+3. 用户输入信息不足
+4. 工具调用失败
+5. 数据库保存失败
+6. 日程时间冲突
+7. 报销字段缺失
+8. 用户取消确认
+
+## 错误返回格式
+
+```json
+{
+  "type": "error",
+  "code": "TOOL_EXECUTION_FAILED",
+  "message": "创建报销草稿失败，请稍后重试。",
+  "detail": {
+    "toolName": "expense.createDraft",
+    "reason": "Database timeout"
+  }
+}
+```
+
+---
+
+# 15. MVP 开发顺序
+
+请按照以下顺序开发。
+
+## 第 1 步：搭建项目
+
+1. 创建 monorepo
+2. 创建 web app
+3. 创建 api app
+4. 配置 TypeScript
+5. 配置 Prisma
+6. 配置 PostgreSQL
+7. 配置基础环境变量
+
+## 第 2 步：数据库
+
+1. 创建 User 表
+2. 创建 AgentSession 表
+3. 创建 AgentMessage 表
+4. 创建 AgentToolCall 表
+5. 创建 CalendarEvent 表
+6. 创建 Expense 表
+7. 创建 ConfirmationRequest 表
+
+## 第 3 步：Agent Core
+
+1. 实现 AgentRuntime
+2. 实现 IntentRouter
+3. 实现 Planner
+4. 实现 Validator
+5. 实现 Executor
+6. 实现 MemoryStore
+7. 实现 AgentLogger
+
+## 第 4 步：Tool Layer
+
+1. 实现 Tool Interface
+2. 实现 CalendarCreateTool
+3. 实现 ExpenseCreateDraftTool
+4. 实现 Tool Registry
+5. 实现 Tool 调用日志
+
+## 第 5 步：API
+
+1. POST /api/agent/sessions
+2. POST /api/agent/chat
+3. GET /api/agent/sessions/:id/messages
+4. GET /api/agent/sessions/:id/tool-calls
+5. POST /api/agent/confirm
+
+## 第 6 步：前端
+
+1. 实现 Chat 页面
+2. 实现消息列表
+3. 实现输入框
+4. 实现缺失字段提示
+5. 实现确认卡片
+6. 实现日志查看页面
+
+## 第 7 步：测试
+
+至少测试以下场景：
+
+### 场景 1：创建完整日程
+
+输入：
+
+```text
+明天下午三点约张三开产品评审会。
+```
+
+预期：
+
+1. 识别为 calendar.create
+2. 生成日程草稿
+3. 让用户确认
+4. 用户确认后保存
+
+### 场景 2：创建缺字段日程
+
+输入：
+
+```text
+帮我约张三开会。
+```
+
+预期：
+
+1. 识别为 calendar.create
+2. 判断缺少时间和会议主题
+3. 追问用户
+
+### 场景 3：创建完整报销草稿
+
+输入：
+
+```text
+帮我报销昨天去机场的打车费，128 元。
+```
+
+预期：
+
+1. 识别为 expense.create
+2. 提取金额、日期、类型、说明
+3. 判断缺少发票和项目
+4. 追问用户补充
+
+### 场景 4：查看工具日志
+
+预期：
+
+1. 可以看到 Intent 结果
+2. 可以看到 Planner 输出
+3. 可以看到 Tool 调用
+4. 可以看到失败原因
+
+---
+
+# 16. 验收标准
+
+MVP 完成后，必须满足：
+
+1. 用户可以在聊天框输入自然语言
+2. 系统可以识别日程和报销两类意图
+3. 系统可以提取基本字段
+4. 系统可以判断缺失字段
+5. 系统可以主动追问用户
+6. 系统可以创建日程草稿
+7. 系统可以创建报销草稿
+8. 用户确认后才会保存正式结果
+9. 每次 Agent 执行都有日志
+10. 每次 Tool 调用都有日志
+11. 前端可以查看会话历史
+12. 前端可以查看工具调用日志
+13. 代码结构清晰，方便后续扩展 OCR、审批流、通知系统
+
+---
+
+# 17. Claude Code 开发要求
+
+请你根据以上文档直接开始开发。
+
+开发时请遵守：
+
+1. 优先完成 MVP，不要过度设计
+2. 所有代码使用 TypeScript
+3. 保持模块清晰
+4. Agent Core 和业务服务解耦
+5. Tool Layer 必须独立封装
+6. 所有 LLM 输出必须做 JSON 校验
+7. 所有工具调用必须写日志
+8. 高风险操作必须二次确认
+9. 先用 mock LLM 也可以，但要预留真实 LLM 接口
+10. 先保证本地能跑起来
+
+请先输出：
+
+1. 项目目录结构
+2. 技术选型确认
+3. 数据库 schema
+4. Agent Core 代码
+5. API 路由
+6. 前端 Chat 页面
+7. 本地启动说明
+
+然后再开始逐步实现。
+
+````
+
+---
+
+你给 Claude Code 的时候，可以在最前面再加一句：
+
+```text
+请严格按照这份 PRD 和架构设计开发，不要擅自扩展复杂功能。第一阶段只做 MVP：聊天入口、意图识别、日程草稿、报销草稿、缺字段追问、用户确认、Agent 日志。
+````
