@@ -4,6 +4,7 @@ import AuthPage from "./pages/AuthPage.js";
 import ChatPage from "./pages/ChatPage.js";
 import LogsPage from "./pages/LogsPage.js";
 import DashboardPage from "./pages/DashboardPage.js";
+import CalendarPage from "./pages/CalendarPage.js";
 
 /** 路由守卫：无 token → 跳转登录 */
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,7 @@ export default function App() {
       <Route path="/chat/:sessionId" element={<RequireAuth><ChatPage /></RequireAuth>} />
       <Route path="/logs/:sessionId" element={<RequireAuth><LogsPage /></RequireAuth>} />
       <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
+      <Route path="/calendar" element={<RequireAuth><CalendarPage /></RequireAuth>} />
     </Routes>
   );
 }

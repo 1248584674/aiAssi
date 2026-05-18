@@ -67,6 +67,17 @@ export default function ChatPage() {
             <NotificationBell />
 
             <button
+              onClick={() => navigate("/calendar")}
+              className="flex items-center gap-1 rounded-xl px-2 md:px-3 py-1.5 text-[11px] text-body-mid transition hover:bg-canvas-soft hover:text-ink"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <rect x="1.5" y="2" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M1.5 5h9M4 1v2M8 1v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              <span className="hidden md:inline">日历</span>
+            </button>
+
+            <button
               onClick={() => navigate("/dashboard")}
               className="flex items-center gap-1 rounded-xl px-2 md:px-3 py-1.5 text-[11px] text-body-mid transition hover:bg-canvas-soft hover:text-ink"
             >
